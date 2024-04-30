@@ -81,19 +81,19 @@ void check_erase(std::vector<int>& idx_arr, rbtree* rbtree, std::map<int, int>& 
 {
   for (size_t i = 0; i < idx_arr.size(); ++i) {
     int key = idx_arr[i];
-    t_rbnode* node = rb_find(reinterpret_cast<void*>(key), rbtree, rb_compare);
-    t_container* c = container_of(node, t_container, node);
 
     //std::cout << std::endl;
     //std::cout << "key = " << key << ", c->node = " << &c->node << ", c->key = " << c->key << ", c->val = " << c->val << '\n';
     if (compare_flag) {
+			t_rbnode* node = rb_find(reinterpret_cast<void*>(key), rbtree, rb_compare);
+			t_container* c = container_of(node, t_container, node);
       rb_erase(rbtree, node);
+			free(c);
     } else {
       map.erase(key);
     }
 
     /*
-    free(c);
     if (check_equal(rbtree, map) == false) {
       std::cout << i << "th erase, key = " << key << ": check_erase fail\n";
       return;
@@ -158,13 +158,13 @@ int main(int argc, char **argv)
 
         auto start = std::chrono::steady_clock::now();
         for (int i = 0; i < max_size; ++i) {
-          t_container* container = static_cast<t_container*>(malloc(sizeof(t_container)));
           int key = idx_arr[i];
-
-          container->key = key;
-          container->val = key;
-
+					
           if (compare_flag) {
+						t_container* container;
+						container = static_cast<t_container*>(malloc(sizeof(t_container)));
+						container->key = key;
+						container->val = key;
             rb_insert_cached(&rbtree, &container->node, rb_less);
           } else {
             map.insert(std::make_pair(key, key));
@@ -185,7 +185,6 @@ int main(int argc, char **argv)
         auto end_erase = std::chrono::steady_clock::now();
         std::chrono::duration<double>  e_duration(end_erase - start_erase);
         //std::cout << "erase time = " << e_duration.count() << "\n\n";
-        rb_postorder_foreach(rbtree.rbtree.root, deallocate);
         i_duration_avg += i_duration.count();
         e_duration_avg += e_duration.count();
       }
@@ -222,5 +221,7 @@ void deallocate(t_rbnode* node)
 {
   t_container*  c = container_of(node, t_container, node);
 
+	node->left = rb_nil;
+	node->right = rb_nil;
   free(c);
 }

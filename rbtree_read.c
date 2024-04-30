@@ -67,8 +67,6 @@ rb_postorder_foreach(t_rbnode* node, void (*op)(t_rbnode*))
   if (node == rb_nil) return;
 
   rb_postorder_foreach(node->left, op);
-  node->left = rb_nil;
   rb_postorder_foreach(node->right, op);
-  node->right = rb_nil;
   op(node);
 }
