@@ -11,11 +11,19 @@
 
 #ifdef RB_DEBUG
 # include "rbtree_debug.h"
-# define DEBUG_FUNCTIONS \
-r4_sanitizer(tree->rbtree.root); \
-r5_sanitizer(tree->rbtree.root);
+# define DEBUG_FUNCTIONS(tree) \
+  r4_sanitizer((tree)->root); \
+  r5_sanitizer((tree)->root);
 #else
-# define DEBUG_FUNCTIONS
+# define DEBUG_FUNCTIONS(tree)
+#endif
+
+#ifdef RB_VIS
+# include "rbtree_debug.h"
+# define VISUALIZE(tree) \
+  visualize((tree)->root, 0, 1);
+#else
+# define VISUALIZE(tree)
 #endif
 
 static void insert_balance(t_rbtree* tree, t_rbnode* node);
@@ -64,7 +72,8 @@ rb_insert(t_rbtree* tree, t_rbnode* node, t_less less)
 
   // set color of inserted node red and rebalance if required.
   insert_balance(tree, node);
-  DEBUG_FUNCTIONS;
+  DEBUG_FUNCTIONS(tree);
+  VISUALIZE(tree);
 }
 
 void
@@ -92,7 +101,8 @@ rb_insert_cached(t_rbtree_cached* tree, t_rbnode* node, t_less less)
 
   link_node(parent, node, insert_at);
   insert_balance(&tree->rbtree, node);
-  DEBUG_FUNCTIONS;
+  DEBUG_FUNCTIONS(&tree->rbtree);
+  VISUALIZE(&tree->rbtree);
 }
 
 static void
@@ -221,7 +231,8 @@ rb_erase(t_rbtree* tree, t_rbnode* node)
   erase_balance(tree, parent);
 
 ret:
-  DEBUG_FUNCTIONS;
+  DEBUG_FUNCTIONS(tree);
+  VISUALIZE(tree);
 }
 
 /*

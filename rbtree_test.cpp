@@ -1,5 +1,6 @@
 #include <iostream>
 #include <map>
+#include <unordered_set>
 #include <vector>
 #include <chrono>
 
@@ -10,9 +11,7 @@
 
 #include "rbtree.h"
 
-static const int  random_range = 100000;
-static int        max_size;
-static bool       compare_flag = false;
+static bool       compare_flag = true;
 
 typedef struct container {
   t_rbnode  node;
@@ -84,12 +83,11 @@ void check_erase(std::vector<int>& idx_arr, rbtree* rbtree, std::map<int, int>& 
 
     //std::cout << std::endl;
     //std::cout << "key = " << key << ", c->node = " << &c->node << ", c->key = " << c->key << ", c->val = " << c->val << '\n';
+    t_rbnode* node = rb_find(reinterpret_cast<void*>(key), rbtree, rb_compare);
+    t_container* c = container_of(node, t_container, node);
+    rb_erase(rbtree, node);
+    free(c);
     if (compare_flag) {
-			t_rbnode* node = rb_find(reinterpret_cast<void*>(key), rbtree, rb_compare);
-			t_container* c = container_of(node, t_container, node);
-      rb_erase(rbtree, node);
-			free(c);
-    } else {
       map.erase(key);
     }
 
@@ -118,102 +116,94 @@ void deallocate(t_rbtree* tree)
 
 int main(int argc, char **argv)
 {
+  // number of test cases
+  int test_count  = 10;
+
+  // initial number of elements for a test. doubled per test completion.
+  int max_size = 1024;
+
+  // number of loops to get average time consumption.
+  int repeat_count = 1;
+  if (argc > 1) {
+    test_count  = 1;
+    max_size = 16;
+    repeat_count = 1;
+  }
+
   int dup_count = 0;
-  int arr[random_range] = {0, };
-  t_rbtree_cached   rbtree = rb_create_tree_cached();
-  std::map<int, int>  map;
-  std::vector<double> rbtree_insert_time;
-  std::vector<double> rbtree_erase_time;
-  std::vector<double> stdmap_insert_time;
-  std::vector<double> stdmap_erase_time;
-//  t_rbtree   rbtree = rb_create_tree();
+  t_rbtree_cached         rbtree = rb_create_tree_cached();
+  std::map<int, int>      map;
+  std::unordered_set<int> number_table;
+
 
   std::srand(static_cast<uintptr_t>(clock()));
 
-  compare_flag = true;
-  while (true) {
-    const int test_count  = 10; // size up to max_size(==1024) * 2^8 
-    std::vector<int>    test_size;
-    max_size = 128;
-    for (int test_idx = 0; test_idx < test_count; ++test_idx) {
-      const int repeat_count = 6;
-      double    i_duration_avg = 0;
-      double    e_duration_avg = 0;
+  for (int test_idx = 0; test_idx < test_count; ++test_idx) {
+    double    rb_insert_time = 0;
+    double    map_insert_time = 0;
+    //double    e_duration_avg = 0;
 
-      test_size.push_back(max_size);
-      std::vector<int> idx_arr(max_size);
-      for (int repeat = 0; repeat < repeat_count; ++repeat) {
-        memset(arr, 0, sizeof(arr));
-        if (rbtree.rbtree.root != rb_nil || map.size() != 0) assert(0);
-        for (int i = 0; i < max_size; ++i) {
-          int key = std::rand() % random_range;
-          if (arr[key] != 0) {
-            ++dup_count;
-            --i;
-            continue;
-          }
-          arr[key] = 1;
-          idx_arr[i] = key;
+    std::vector<int> idx_arr(max_size);
+    for (int repeat = 0; repeat < repeat_count; ++repeat) {
+      if (rbtree.rbtree.root != rb_nil || map.size() != 0) assert(0);
+      for (int i = 0; i < max_size; ++i) {
+        int random_range = max_size * 3;
+        int key = std::rand() % random_range;
+        if (number_table.count(key) != 0) {
+          ++dup_count;
+          --i;
+          continue;
         }
+        number_table.insert(key);
+        idx_arr[i] = key;
+      }
 
-        auto start = std::chrono::steady_clock::now();
+      auto start = std::chrono::steady_clock::now();
+      for (int i = 0; i < max_size; ++i) {
+        int key = idx_arr[i];
+        
+        t_container* container;
+        container = static_cast<t_container*>(malloc(sizeof(t_container)));
+        *container = (t_container){.key = key, .val = key * key};
+        rb_insert_cached(&rbtree, &container->node, rb_less);
+      }
+      auto end = std::chrono::steady_clock::now();
+      std::chrono::duration<double>  i_duration(end - start);
+      rb_insert_time += i_duration.count();
+
+      if (compare_flag) {
+        start = std::chrono::steady_clock::now();
         for (int i = 0; i < max_size; ++i) {
           int key = idx_arr[i];
-					
-          if (compare_flag) {
-						t_container* container;
-						container = static_cast<t_container*>(malloc(sizeof(t_container)));
-						container->key = key;
-						container->val = key;
-            rb_insert_cached(&rbtree, &container->node, rb_less);
-          } else {
-            map.insert(std::make_pair(key, key));
-          }
+          map.insert(std::make_pair(key, key * key));
         }
-        auto end = std::chrono::steady_clock::now();
+        end = std::chrono::steady_clock::now();
         std::chrono::duration<double>  i_duration(end - start);
-        /*
-        if (check_equal(&rbtree.rbtree, map) == false) {
-          std::cout << "fail\n";
-        } else {
-          std::cout << "insert success\n";
-        }
-        */
-        //std::cout << "insert time = " << i_duration.count() << '\n';
-        auto start_erase = std::chrono::steady_clock::now();
-        check_erase(idx_arr, &rbtree.rbtree, map);
-        auto end_erase = std::chrono::steady_clock::now();
-        std::chrono::duration<double>  e_duration(end_erase - start_erase);
-        //std::cout << "erase time = " << e_duration.count() << "\n\n";
-        i_duration_avg += i_duration.count();
-        e_duration_avg += e_duration.count();
+        map_insert_time += i_duration.count();
       }
-      if (compare_flag) {
-        rbtree_insert_time.push_back(i_duration_avg / repeat_count);
-        rbtree_erase_time.push_back(e_duration_avg / repeat_count);
-      } else {
-        stdmap_insert_time.push_back(i_duration_avg / repeat_count);
-        stdmap_erase_time.push_back(e_duration_avg / repeat_count);
+
+      if (compare_flag && check_equal(&rbtree.rbtree, map) == false) {
+        std::cout << "case " << test_idx << ": fail\n";
+        break;
       }
-      max_size *= 2;
+      check_erase(idx_arr, &rbtree.rbtree, map);
+      /*
+      std::cout << "insert time = " << i_duration.count() << '\n';
+      auto start_erase = std::chrono::steady_clock::now();
+      auto end_erase = std::chrono::steady_clock::now();
+      std::chrono::duration<double>  e_duration(end_erase - start_erase);
+      std::cout << "erase time = " << e_duration.count() << "\n\n";
+      e_duration_avg += e_duration.count();
+      */
     }
+    std::cout << "case " << test_idx << ": data size=" << max_size << '\n';
+    std::cout << "rbtree = " << rb_insert_time / repeat_count;
     if (compare_flag) {
-      std::cout << "rbtree profile\n";
-      for (int i = 0; i < test_count; ++i) {
-        std::cout << "case " << i << ": data size=" << test_size[i] << ", average insertion time=" << rbtree_insert_time[i] << ", average erase time=" << rbtree_erase_time[i] << '\n';
-      }
-    } else {
-      std::cout << "std::map profile\n";
-      for (int i = 0; i < test_count; ++i) {
-        std::cout << "case " << i << ": data size=" << test_size[i] << ", average insertion time=" << stdmap_insert_time[i] << ", average erase time=" << stdmap_erase_time[i] << '\n';
-      }
-      std::cout << "runtime ratio\n";
-      for (int i = 0; i < test_count; ++i) {
-        std::cout << "case " << i << ": data size=" << test_size[i] << ", std::map and rbtree runtime ratio(stdmap/rbtree): insert=" << stdmap_insert_time[i] / rbtree_insert_time[i] << ", erase=" << stdmap_erase_time[i] / rbtree_erase_time[i] << '\n';
-      }
+      std::cout << ", map = " << map_insert_time / repeat_count;
+      std::cout << ", ratio = " << rb_insert_time / map_insert_time << '\n';
     }
-    if (compare_flag == false) break;
-    compare_flag = false;
+    std::cout << '\n';
+    max_size *= 2;
   }
 }
 

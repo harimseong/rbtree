@@ -1,26 +1,62 @@
-NAME		= rbtree_test
+NAME			:= rbtree_test
 
-CFLAGS	= -Wall -Wextra -std=c++14 -g -fsanitize=address
 
-MAIN		=	rbtree_test.o
-OBJS		=	rbtree_write.o \
-					rbtree_read.o
+C					:= clang++
+CFLAGS		:= -Wall -Wextra -std=c++14 -O3 -DRB_VIS
 
-SRCS		= $(OBJS:%.o=%.c)
 
-all: $(NAME)
+CXX				:= clang++
+CXXFLAGS	:= -Wall -Wextra -std=c++14 -O3
 
-$(NAME): $(OBJS) rbtree_test.o
-	$(CXX) $(CFLAGS) -o $@ $^ -I.
 
-$(MAIN): %.o: %.cpp
-	$(CXX) $(CFLAGS) -o $@ -c $^ -I.
+DEBUGFLAGS:= -g -fsanitize=address #-DRB_DEBUG
 
-$(OBJS): %.o: %.c
-	$(CXX) $(CFLAGS) -o $@ -c $^ -I.
+
+SRC_CPP		:=  rbtree_test.cpp
+SRC_C			:=	rbtree_write.c\
+							rbtree_read.c
+OBJ_CPP		:= $(SRC_CPP:%.cpp=%.o)
+OBJ_C			:= $(SRC_C:%.c=%.o)
+
+
+STATE     :=  $(shell ls .DEBUG 2> /dev/null)
+ifeq ($(STATE), .DEBUG)
+CFLAGS  		+=  $(DEBUGFLAGS)
+CXXFLAGS  	+=  $(DEBUGFLAGS)
+COMPILE_MODE:=  .DEBUG
+else
+COMPILE_MODE:=  .RELEASE
+endif
+
+
+all: $(COMPILE_MODE)
+	$(MAKE) $(NAME)
+
+release: .RELEASE
+	$(MAKE) all
+
+debug: .DEBUG
+	$(MAKE) all
+
+.RELEASE:
+	$(MAKE) fclean
+	touch .RELEASE
+
+.DEBUG:
+	$(MAKE) fclean
+	touch .DEBUG
+
+$(NAME): $(OBJ_CPP) $(OBJ_C)
+	$(CXX) $(CXXFLAGS) -o $@ $^ -I.
+
+$(OBJ_CPP): %.o: %.cpp
+	$(CXX) $(CXXFLAGS) -o $@ -c $< -I.
+
+$(OBJ_C): %.o: %.c
+	$(C) $(CFLAGS) -o $@ -c $< -I.
 
 clean:
-	$(RM) $(OBJS) $(MAIN)
+	$(RM) $(OBJ_C) $(OBJ_CPP) .DEBUG .RELEASE
 
 fclean: clean
 	$(RM) $(NAME)
